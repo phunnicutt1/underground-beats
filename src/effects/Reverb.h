@@ -1,75 +1,162 @@
+/*
+ * Underground Beats
+ * Reverb.h
+ * 
+ * Reverb effect for creating spatial depth
+ */
+
 #pragma once
 
-#include <JuceHeader.h>
-#include "../audio-engine/ProcessorNode.h"
+#include "Effect.h"
+
+namespace UndergroundBeats {
 
 /**
- * Reverb effect processor with room size, damping, and mix controls.
+ * @class Reverb
+ * @brief Reverb effect for creating spatial depth
+ * 
+ * The Reverb class implements a reverb effect with controls for
+ * room size, damping, width, and freeze mode.
  */
-class Reverb : public ProcessorNode
-{
-public:
-    /** Parameter indices */
-    enum ParameterIndex
-    {
-        RoomSizeParam,
-        DampingParam,
-        WidthParam,
-        DryWetParam,
-        NumParams
-    };
-    
+class Reverb : public Effect {
 public:
     Reverb();
     ~Reverb() override;
     
-    const juce::String getName() const override { return "Reverb"; }
-    
-    /** Set the room size (0.0 - 1.0) */
+    /**
+     * @brief Set the room size
+     * 
+     * @param size Room size (0 to 1)
+     */
     void setRoomSize(float size);
     
-    /** Set the damping amount (0.0 - 1.0) */
-    void setDamping(float damping);
+    /**
+     * @brief Get the current room size
+     * 
+     * @return The current room size
+     */
+    float getRoomSize() const;
     
-    /** Set the stereo width (0.0 - 1.0) */
+    /**
+     * @brief Set the damping amount
+     * 
+     * @param amount Damping amount (0 to 1)
+     */
+    void setDamping(float amount);
+    
+    /**
+     * @brief Get the current damping amount
+     * 
+     * @return The current damping amount
+     */
+    float getDamping() const;
+    
+    /**
+     * @brief Set the stereo width
+     * 
+     * @param width Stereo width (0 to 1)
+     */
     void setWidth(float width);
     
-    /** Set the dry/wet mix (0.0 = dry, 1.0 = wet) */
-    void setDryWet(float dryWet);
+    /**
+     * @brief Get the current stereo width
+     * 
+     * @return The current stereo width
+     */
+    float getWidth() const;
     
-    //==============================================================================
-    // AudioProcessor overrides
-    void prepareToPlay(double sampleRate, int samplesPerBlock) override;
-    void releaseResources() override;
-    void processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages) override;
+    /**
+     * @brief Set freeze mode
+     * 
+     * @param freeze true for freeze mode, false for normal mode
+     */
+    void setFreeze(bool freeze);
     
-    //==============================================================================
-    // Custom SIMD processing
-    void processBlockSIMD(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages) override;
+    /**
+     * @brief Check if freeze mode is enabled
+     * 
+     * @return true if freeze mode is enabled
+     */
+    bool getFreeze() const;
+    
+    /**
+     * @brief Prepare the effect for processing
+     * 
+     * @param sampleRate The sample rate in Hz
+     * @param blockSize The maximum block size in samples
+     */
+    void prepare(double sampleRate, int blockSize) override;
+    
+    /**
+     * @brief Reset the effect state
+     */
+    void reset() override;
+    
+    /**
+     * @brief Create an XML element containing the effect's state
+     * 
+     * @return XML element containing effect state
+     */
+    std::unique_ptr<juce::XmlElement> createStateXml() const override;
+    
+    /**
+     * @brief Restore effect state from an XML element
+     * 
+     * @param xml XML element containing effect state
+     * @return true if state was successfully restored
+     */
+    bool restoreStateFromXml(const juce::XmlElement* xml) override;
+    
+protected:
+    /**
+     * @brief Process a single sample (mono)
+     * 
+     * @param sample The input sample
+     * @return The processed sample
+     */
+    float processSample(float sample) override;
+    
+    /**
+     * @brief Process a single sample (stereo)
+     * 
+     * @param leftSample The left channel input sample
+     * @param rightSample The right channel input sample
+     * @param leftOutput Pointer to store left channel output
+     * @param rightOutput Pointer to store right channel output
+     */
+    void processSampleStereo(float leftSample, float rightSample, float* leftOutput, float* rightOutput) override;
+    
+    /**
+     * @brief Process a buffer of samples
+     * 
+     * @param buffer Buffer containing samples to process
+     * @param numSamples Number of samples to process
+     */
+    void processBuffer(float* buffer, int numSamples) override;
+    
+    /**
+     * @brief Process a stereo buffer
+     * 
+     * @param leftBuffer Left channel buffer
+     * @param rightBuffer Right channel buffer
+     * @param numSamples Number of samples to process
+     */
+    void processBufferStereo(float* leftBuffer, float* rightBuffer, int numSamples) override;
     
 private:
-    /** Update reverb parameters when settings change */
+    // Reverb parameters
+    float roomSize;
+    float damping;
+    float width;
+    bool freeze;
+    
+    // JUCE reverb implementation
+    juce::Reverb jucereverb;
+    
+    // Update reverb parameters
     void updateParameters();
     
-    //==============================================================================
-    // Effect parameters
-    float roomSize;
-    float dampingAmount;
-    float stereoWidth;
-    float dryWetMix;
-    
-    // JUCE reverb processor
-    juce::Reverb reverb;
-    juce::Reverb::Parameters reverbParams;
-    
-    // Process spec for DSP modules
-    juce::dsp::ProcessSpec processSpec;
-    
-    // Parameter smoothing
-    juce::LinearSmoothedValue<float> roomSizeSmoothed;
-    juce::LinearSmoothedValue<float> dampingSmoothed;
-    juce::LinearSmoothedValue<float> widthSmoothed;
-    juce::LinearSmoothedValue<float> dryWetSmoothed;
-    
-    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR (Reverb)
+    JUCE_DECLARE_NON_COPYABLE_WITH_LEAK_DETECTOR(Reverb)
 };
+
+} // namespace UndergroundBeats

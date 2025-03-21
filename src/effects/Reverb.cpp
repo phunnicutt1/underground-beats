@@ -1,256 +1,184 @@
+/*
+ * Underground Beats
+ * Reverb.cpp
+ * 
+ * Implementation of reverb effect
+ */
+
 #include "Reverb.h"
 
+namespace UndergroundBeats {
+
 Reverb::Reverb()
-    : roomSize(0.5f),        // 50% default room size
-      dampingAmount(0.5f),   // 50% default damping
-      stereoWidth(1.0f),     // 100% default width
-      dryWetMix(0.3f)        // 30% default wet mix
+    : Effect("Reverb")
+    , roomSize(0.5f)
+    , damping(0.5f)
+    , width(1.0f)
+    , freeze(false)
 {
-    // Set parameter defaults
-    parameters[RoomSizeParam].store(roomSize);
-    parameters[DampingParam].store(dampingAmount);
-    parameters[WidthParam].store(stereoWidth);
-    parameters[DryWetParam].store(dryWetMix);
-    
-    // Initialize reverb parameters
-    reverbParams.roomSize = roomSize;
-    reverbParams.damping = dampingAmount;
-    reverbParams.wetLevel = dryWetMix;
-    reverbParams.dryLevel = 1.0f - dryWetMix;
-    reverbParams.width = stereoWidth;
-    reverbParams.freezeMode = 0.0f;
-    
-    // Configure the reverb with initial parameters
-    reverb.setParameters(reverbParams);
+    updateParameters();
 }
 
 Reverb::~Reverb()
 {
-    // No special cleanup needed
 }
 
 void Reverb::setRoomSize(float size)
 {
-    // Clamp to 0-1 range
     roomSize = juce::jlimit(0.0f, 1.0f, size);
-    parameters[RoomSizeParam].store(roomSize);
-    
-    // Update smoothed value if prepared
-    if (isPrepared)
-    {
-        roomSizeSmoothed.setTargetValue(roomSize);
-        updateParameters();
-    }
+    updateParameters();
 }
 
-void Reverb::setDamping(float damping)
+float Reverb::getRoomSize() const
 {
-    // Clamp to 0-1 range
-    dampingAmount = juce::jlimit(0.0f, 1.0f, damping);
-    parameters[DampingParam].store(dampingAmount);
-    
-    // Update smoothed value if prepared
-    if (isPrepared)
-    {
-        dampingSmoothed.setTargetValue(dampingAmount);
-        updateParameters();
-    }
+    return roomSize;
+}
+
+void Reverb::setDamping(float amount)
+{
+    damping = juce::jlimit(0.0f, 1.0f, amount);
+    updateParameters();
+}
+
+float Reverb::getDamping() const
+{
+    return damping;
 }
 
 void Reverb::setWidth(float width)
 {
-    // Clamp to 0-1 range
-    stereoWidth = juce::jlimit(0.0f, 1.0f, width);
-    parameters[WidthParam].store(stereoWidth);
-    
-    // Update smoothed value if prepared
-    if (isPrepared)
-    {
-        widthSmoothed.setTargetValue(stereoWidth);
-        updateParameters();
-    }
-}
-
-void Reverb::setDryWet(float dryWet)
-{
-    // Clamp to 0-1 range
-    dryWetMix = juce::jlimit(0.0f, 1.0f, dryWet);
-    parameters[DryWetParam].store(dryWetMix);
-    
-    // Update smoothed value if prepared
-    if (isPrepared)
-    {
-        dryWetSmoothed.setTargetValue(dryWetMix);
-        updateParameters();
-    }
-}
-
-void Reverb::prepareToPlay(double sampleRate, int samplesPerBlock)
-{
-    ProcessorNode::prepareToPlay(sampleRate, samplesPerBlock);
-    
-    // Set up process spec
-    processSpec.sampleRate = sampleRate;
-    processSpec.maximumBlockSize = samplesPerBlock;
-    processSpec.numChannels = 2;  // Stereo by default
-    
-    // Initialize parameter smoothing
-    roomSizeSmoothed.reset(sampleRate, 0.05);  // 50ms smoothing
-    roomSizeSmoothed.setCurrentAndTargetValue(roomSize);
-    
-    dampingSmoothed.reset(sampleRate, 0.05);  // 50ms smoothing
-    dampingSmoothed.setCurrentAndTargetValue(dampingAmount);
-    
-    widthSmoothed.reset(sampleRate, 0.05);  // 50ms smoothing
-    widthSmoothed.setCurrentAndTargetValue(stereoWidth);
-    
-    dryWetSmoothed.reset(sampleRate, 0.05);  // 50ms smoothing
-    dryWetSmoothed.setCurrentAndTargetValue(dryWetMix);
-    
-    // Prepare the reverb processor
-    reverb.setSampleRate(sampleRate);
-    
-    // Update parameters for initial settings
+    this->width = juce::jlimit(0.0f, 1.0f, width);
     updateParameters();
 }
 
-void Reverb::releaseResources()
+float Reverb::getWidth() const
 {
-    ProcessorNode::releaseResources();
+    return width;
 }
 
-void Reverb::processBlock(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
+void Reverb::setFreeze(bool freeze)
 {
-    // Use the SIMD-optimized processing
-    processBlockSIMD(buffer, midiMessages);
+    this->freeze = freeze;
+    updateParameters();
 }
 
-void Reverb::processBlockSIMD(juce::AudioBuffer<float>& buffer, juce::MidiBuffer& midiMessages)
+bool Reverb::getFreeze() const
 {
-    juce::ScopedNoDenormals noDenormals;
+    return freeze;
+}
+
+void Reverb::prepare(double sampleRate, int blockSize)
+{
+    Effect::prepare(sampleRate, blockSize);
     
-    const int numChannels = buffer.getNumChannels();
-    const int numSamples = buffer.getNumSamples();
+    // Set up the JUCE reverb
+    jucereverb.reset();
+    jucereverb.setSampleRate(sampleRate);
     
-    // Create a temporary buffer for the dry signal
-    juce::AudioBuffer<float> dryBuffer;
-    dryBuffer.makeCopyOf(buffer);
+    updateParameters();
+}
+
+void Reverb::reset()
+{
+    Effect::reset();
     
-    // Check if parameters have changed
-    bool paramsChanged = false;
+    // Reset the JUCE reverb
+    jucereverb.reset();
+}
+
+std::unique_ptr<juce::XmlElement> Reverb::createStateXml() const
+{
+    auto xml = Effect::createStateXml();
     
-    // Update room size
-    if (!roomSizeSmoothed.isSmoothing())
+    // Add reverb-specific attributes
+    xml->setAttribute("roomSize", roomSize);
+    xml->setAttribute("damping", damping);
+    xml->setAttribute("width", width);
+    xml->setAttribute("freeze", freeze);
+    
+    return xml;
+}
+
+bool Reverb::restoreStateFromXml(const juce::XmlElement* xml)
+{
+    if (!Effect::restoreStateFromXml(xml))
     {
-        float newSize = parameters[RoomSizeParam].load();
-        if (std::abs(newSize - roomSize) > 0.01f)
-        {
-            roomSize = newSize;
-            roomSizeSmoothed.setTargetValue(roomSize);
-            paramsChanged = true;
-        }
-    }
-    else
-    {
-        // If still smoothing, get the next value
-        roomSizeSmoothed.skip(numSamples - 1);
-        float newSize = roomSizeSmoothed.getNextValue();
-        if (std::abs(newSize - roomSize) > 0.01f)
-        {
-            roomSize = newSize;
-            paramsChanged = true;
-        }
-    }
-    
-    // Update damping
-    if (!dampingSmoothed.isSmoothing())
-    {
-        float newDamping = parameters[DampingParam].load();
-        if (std::abs(newDamping - dampingAmount) > 0.01f)
-        {
-            dampingAmount = newDamping;
-            dampingSmoothed.setTargetValue(dampingAmount);
-            paramsChanged = true;
-        }
-    }
-    else
-    {
-        // If still smoothing, get the next value
-        dampingSmoothed.skip(numSamples - 1);
-        float newDamping = dampingSmoothed.getNextValue();
-        if (std::abs(newDamping - dampingAmount) > 0.01f)
-        {
-            dampingAmount = newDamping;
-            paramsChanged = true;
-        }
+        return false;
     }
     
-    // Update width
-    if (!widthSmoothed.isSmoothing())
+    // Restore reverb-specific attributes
+    if (xml->hasAttribute("roomSize"))
     {
-        float newWidth = parameters[WidthParam].load();
-        if (std::abs(newWidth - stereoWidth) > 0.01f)
-        {
-            stereoWidth = newWidth;
-            widthSmoothed.setTargetValue(stereoWidth);
-            paramsChanged = true;
-        }
-    }
-    else
-    {
-        // If still smoothing, get the next value
-        widthSmoothed.skip(numSamples - 1);
-        float newWidth = widthSmoothed.getNextValue();
-        if (std::abs(newWidth - stereoWidth) > 0.01f)
-        {
-            stereoWidth = newWidth;
-            paramsChanged = true;
-        }
+        setRoomSize(xml->getDoubleAttribute("roomSize", 0.5f));
     }
     
-    // Update dry/wet mix
-    if (!dryWetSmoothed.isSmoothing())
+    if (xml->hasAttribute("damping"))
     {
-        float newDryWet = parameters[DryWetParam].load();
-        if (std::abs(newDryWet - dryWetMix) > 0.01f)
-        {
-            dryWetMix = newDryWet;
-            dryWetSmoothed.setTargetValue(dryWetMix);
-            paramsChanged = true;
-        }
-    }
-    else
-    {
-        // If still smoothing, get the next value
-        dryWetSmoothed.skip(numSamples - 1);
-        float newDryWet = dryWetSmoothed.getNextValue();
-        if (std::abs(newDryWet - dryWetMix) > 0.01f)
-        {
-            dryWetMix = newDryWet;
-            paramsChanged = true;
-        }
+        setDamping(xml->getDoubleAttribute("damping", 0.5f));
     }
     
-    // Update reverb parameters if needed
-    if (paramsChanged)
+    if (xml->hasAttribute("width"))
     {
-        updateParameters();
+        setWidth(xml->getDoubleAttribute("width", 1.0f));
     }
     
-    // Process the buffer through the reverb
-    reverb.processStereo(buffer.getWritePointer(0), buffer.getWritePointer(1), numSamples);
+    if (xml->hasAttribute("freeze"))
+    {
+        setFreeze(xml->getBoolAttribute("freeze", false));
+    }
+    
+    return true;
+}
+
+float Reverb::processSample(float sample)
+{
+    // Process through the reverb
+    // Note: JUCE's reverb is inherently stereo, so we'll process mono as if it's both left and right
+    float left = sample;
+    float right = sample;
+    
+    jucereverb.processStereo(&left, &right, 1);
+    
+    // Return the average of left and right channels
+    return (left + right) * 0.5f;
+}
+
+void Reverb::processSampleStereo(float leftSample, float rightSample, float* leftOutput, float* rightOutput)
+{
+    // Process through the reverb
+    *leftOutput = leftSample;
+    *rightOutput = rightSample;
+    
+    jucereverb.processStereo(leftOutput, rightOutput, 1);
+}
+
+void Reverb::processBuffer(float* buffer, int numSamples)
+{
+    // Process each sample through the reverb
+    for (int i = 0; i < numSamples; ++i)
+    {
+        buffer[i] = processSample(buffer[i]);
+    }
+}
+
+void Reverb::processBufferStereo(float* leftBuffer, float* rightBuffer, int numSamples)
+{
+    // Process the buffer through the JUCE reverb
+    jucereverb.processStereo(leftBuffer, rightBuffer, numSamples);
 }
 
 void Reverb::updateParameters()
 {
-    // Update the reverb parameters
-    reverbParams.roomSize = roomSize;
-    reverbParams.damping = dampingAmount;
-    reverbParams.wetLevel = dryWetMix;
-    reverbParams.dryLevel = 1.0f - dryWetMix;
-    reverbParams.width = stereoWidth;
-    reverbParams.freezeMode = 0.0f;
+    // Configure JUCE reverb parameters
+    juce::Reverb::Parameters params;
+    params.roomSize = roomSize;
+    params.damping = damping;
+    params.wetLevel = 1.0f; // We'll handle dry/wet mix with the base Effect class
+    params.dryLevel = 0.0f;
+    params.width = width;
+    params.freezeMode = freeze ? 1.0f : 0.0f;
     
-    // Apply the parameters to the reverb processor
-    reverb.setParameters(reverbParams);
+    jucereverb.setParameters(params);
 }
+
+} // namespace UndergroundBeats

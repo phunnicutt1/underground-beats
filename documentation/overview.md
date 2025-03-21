@@ -63,12 +63,13 @@ Underground Beats is built with:
   - Multi-mode filter
   - Polyphonic voice management
 
-### Planned Components
-
-- **Effects Processing** *(Coming Soon)*: Audio signal processing
+- [Effects Processing](effects-processing.md): Audio signal processing
+  - Effect base class
+  - Delay effect with feedback and tempo sync
+  - Reverb effect for spatial processing
   - Effect chain management
-  - Parameter automation
-  - Preset system
+
+### Planned Components
 
 - **Sequencer** *(Coming Soon)*: Pattern-based composition
   - Pattern editor
@@ -101,6 +102,12 @@ The current implementation includes:
    - SynthVoice class for individual synthesis voices
    - SynthModule class for polyphonic synthesis
 
+3. **Effects Processing**:
+   - Effect base class for common effect functionality
+   - Delay effect with stereo and tempo-sync capabilities
+   - Reverb effect for spatial processing
+   - EffectsChain class for managing multiple effects
+
 ## Code Organization
 
 The project follows a structured directory organization:
@@ -109,7 +116,7 @@ The project follows a structured directory organization:
 /src
   /audio-engine           # Audio processing core
   /synthesis              # Sound generation components
-  /effects                # Audio effects processing (planned)
+  /effects                # Audio effects processing
   /sequencer              # Pattern sequencing and MIDI (planned)
   /ui                     # User interface components (planned)
   /project                # Project state management (planned)
@@ -138,10 +145,10 @@ Key performance optimizations include:
 
 The roadmap for future development includes:
 
-1. **Effects Processing**: Implement delay, reverb, and other audio effects
-2. **Sequencer**: Create the pattern-based sequencing system
-3. **User Interface**: Develop the graphical interface for all components
-4. **Project State**: Implement saving and loading of projects
+1. **Sequencer**: Create the pattern-based sequencing system
+2. **User Interface**: Develop the graphical interface for all components
+3. **Project State**: Implement saving and loading of projects
+4. **Additional Effects**: Implement more audio effects (EQ, compression, etc.)
 5. **Plugin Support**: Add support for third-party audio plugins
 6. **Advanced Synthesis**: Expand synthesis capabilities with more advanced techniques
 
