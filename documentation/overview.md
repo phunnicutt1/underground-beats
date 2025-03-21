@@ -69,17 +69,20 @@ Underground Beats is built with:
   - Reverb effect for spatial processing
   - Effect chain management
 
+- [Sequencer](sequencer.md): Pattern-based composition
+  - Pattern data structure for notes and automation
+  - Timeline for pattern arrangement
+  - Transport controls and playback
+  - MIDI input/output handling
+
+- [User Interface](user-interface.md): User interaction and visual components
+  - Application component structure
+  - Pattern editor with piano roll interface
+  - Mixer interface with channel strips and routing
+  - Control panels for settings and parameters
+  - Tabbed interface for organizing functionality
+
 ### Planned Components
-
-- **Sequencer** *(Coming Soon)*: Pattern-based composition
-  - Pattern editor
-  - MIDI handling
-  - Transport control
-
-- **User Interface** *(Coming Soon)*: User interaction and visual components
-  - Component hierarchy
-  - Workflow optimization
-  - Real-time visualization
 
 - **Project State** *(Coming Soon)*: Session data management
   - Project saving/loading
@@ -96,17 +99,31 @@ The current implementation includes:
    - AudioDeviceManager for device handling
 
 2. **Synthesis Engine**:
-   - Oscillator class with multiple waveform types
-   - Envelope class with ADSR functionality
-   - Filter class with multiple filter types
-   - SynthVoice class for individual synthesis voices
-   - SynthModule class for polyphonic synthesis
+   - Oscillator class with multiple waveform types (sine, triangle, sawtooth, square, noise, wavetable)
+   - Envelope class with ADSR functionality and customizable curves
+   - Filter class with multiple filter types (low-pass, high-pass, band-pass, notch, shelf)
+   - SynthVoice class for individual synthesis voices with 2 oscillators, filter and envelope
+   - SynthModule class for polyphonic synthesis with voice management
 
 3. **Effects Processing**:
-   - Effect base class for common effect functionality
-   - Delay effect with stereo and tempo-sync capabilities
-   - Reverb effect for spatial processing
-   - EffectsChain class for managing multiple effects
+   - Effect base class for common effect functionality with wet/dry mixing
+   - Delay effect with stereo, feedback, cross-feedback and tempo-sync capabilities
+   - Reverb effect for spatial processing with room size, damping, and width controls
+   - EffectsChain class for managing multiple effects with flexible ordering
+
+4. **Sequencer**:
+   - Pattern class for storing MIDI notes and parameter automation
+   - Timeline class for arranging patterns with non-destructive editing
+   - Sequencer class for playback with transport controls and timing management
+   - MidiEngine class for handling MIDI input/output with device selection
+
+5. **User Interface**:
+   - AppComponent class as the main application component with tabbed interface
+   - PatternEditor class for piano roll-style note editing
+   - PatternControlPanel class for editing settings and transport controls
+   - PatternEditorView class combining editor and controls in a complete interface
+   - MixerChannel class for channel strip controls (level, pan, mute, solo)
+   - MixerView class with multiple channels and effect sends
 
 ## Code Organization
 
@@ -117,8 +134,10 @@ The project follows a structured directory organization:
   /audio-engine           # Audio processing core
   /synthesis              # Sound generation components
   /effects                # Audio effects processing
-  /sequencer              # Pattern sequencing and MIDI (planned)
-  /ui                     # User interface components (planned)
+  /sequencer              # Pattern sequencing and MIDI
+  /ui                     # User interface components
+    /components           # Reusable UI components
+    /views                # Application views
   /project                # Project state management (planned)
   /utils                  # Utility functions and helpers (planned)
   /tests                  # Test suites for all components (planned)
@@ -140,17 +159,56 @@ Key performance optimizations include:
 - **Lock-Free Programming**: Ensuring glitch-free audio with lock-free data structures
 - **Memory Management**: Strategic memory handling to avoid allocations in audio threads
 - **Cache Optimization**: Designing data structures for optimal cache utilization
+- **Efficient UI Updates**: Throttled UI updates to minimize CPU usage
+
+## Integration Between Components
+
+The Underground Beats application components are designed to work seamlessly together:
+
+1. **Audio Engine + Synthesis**:
+   - Synthesizer modules can be added as processor nodes in the audio graph
+   - Thread-safe parameter control allows real-time synthesis adjustment
+
+2. **Audio Engine + Effects**:
+   - Effect chains can be inserted at any point in the processor graph
+   - Parameter automation enables dynamic effect control
+
+3. **Sequencer + Synthesis**:
+   - MIDI notes from sequencer drive synthesizer voices
+   - Parameter automation from patterns controls synthesis parameters
+
+4. **Sequencer + Effects**:
+   - Tempo information syncs delay times and modulation rates
+   - Parameter automation controls effect parameters
+
+5. **UI + All Components**:
+   - UI controls interact with all underlying components
+   - Real-time state updates reflect component status in the UI
+
+6. **Mixer + Audio Engine**:
+   - Mixer channels control audio routing and levels
+   - Effect sends route audio to effect processors
 
 ## Future Development
 
 The roadmap for future development includes:
 
-1. **Sequencer**: Create the pattern-based sequencing system
-2. **User Interface**: Develop the graphical interface for all components
-3. **Project State**: Implement saving and loading of projects
-4. **Additional Effects**: Implement more audio effects (EQ, compression, etc.)
-5. **Plugin Support**: Add support for third-party audio plugins
-6. **Advanced Synthesis**: Expand synthesis capabilities with more advanced techniques
+1. **Project State**:
+   - Project file format for saving all settings and patterns
+   - Preset system for synths and effects
+   - User preferences management
+
+2. **UI Enhancements**:
+   - Synth parameter panels for detailed synthesis control
+   - Effects configuration interface
+   - Advanced visualization components
+   - Automation editing interface
+
+3. **Advanced Features**:
+   - Additional synthesis methods (FM, granular, physical modeling)
+   - More audio effects (EQ, compression, distortion)
+   - Audio recording and sample manipulation
+   - External plugin support (VST/AU)
 
 ## Contributing
 
